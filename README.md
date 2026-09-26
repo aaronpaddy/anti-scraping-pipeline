@@ -80,14 +80,14 @@ The misses come from spikes every minute or two, when one 10-second window's p99
 
 p99 varies between runs on the same machine: a later 10-minute run measured 344 ms, with 8,714 batches falling back to rules.
 
-Detection accuracy from that later run, which includes the harder personas (see [`spec.md`](spec.md) §4.1). "Alerted" and "Blocked" are the share of users with at least one such decision in 10 minutes:
+Detection accuracy over 10 minutes, including the harder personas (see [`spec.md`](spec.md) §4.1). "Blocked" is the share of users blocked at least once. The two columns compare the old rule (block on one score ≥ 0.95) with the current one (block only when 8 of the user's last 10 scores are high; see §4.5):
 
-| Persona | Users | Alerted | Blocked |
+| Persona | Users | Blocked, old rule | Blocked, current rule |
 | --- | --- | --- | --- |
-| human | 42,508 | 12.5% | 7.5% |
-| power user | 2,382 | 3.9% | 2.4% |
-| scraper | 2,543 | 100% | 100% |
-| stealth scraper | 1,478 | 100% | 100% |
-| teleporter | 1,089 | 100% | 8.9% |
+| human | ~42,500 | 7.5% | **0.7%** |
+| power user | ~2,400 | 2.4% | **0%** |
+| scraper | ~2,500 | 100% | 100% |
+| stealth scraper | ~1,470 | 100% | 100% |
+| teleporter | ~1,050 | 8.9% | 0.8% (all flagged by the velocity check) |
 
-Every bot type is caught, but user-level precision is only 56% for blocks: about 1 in 13 ordinary humans gets blocked at least once. Each human event has a small chance of scoring above the block threshold (about 0.3% offline), and a human sends dozens of events in 10 minutes. Blocking on a single event is too aggressive.
+With the current rule, 93.4% of blocked users are bots, up from 56%. The cost is speed: offline replay puts the median time to block a stealth scraper at about 107 s, up from 38 s. The humans still blocked browse many distinct profiles with fairly regular timing, so they look like stealth scrapers; reducing them further needs better features.

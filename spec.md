@@ -192,15 +192,27 @@ An earlier design used one `dedup:v1:{event_id}` key per event. At 10k events/se
 
 ### 4.5 Decision Policy
 
-| Velocity triggered | AI score | Action |
-| --- | --- | --- |
-| any | ≥ 0.95 | `BLOCK_SESSION` |
-| yes | ≥ 0.85 | `BLOCK_SESSION` |
-| yes | < 0.85 or unavailable | `FLAG_FOR_REVIEW` |
-| no | 0.85 – 0.95 | `FLAG_FOR_REVIEW` |
-| no | < 0.85 or unavailable | `ALLOW` |
+A block needs **sustained** evidence: at least 8 of the user's last 10 AI scores are ≥ 0.85, counting the current one. The engine keeps each user's last 10 scores in memory, per partition.
+
+| Velocity triggered | AI score (this event) | Sustained | Action |
+| --- | --- | --- | --- |
+| any | ≥ 0.95 | yes | `BLOCK_SESSION` |
+| yes | ≥ 0.85 | yes | `BLOCK_SESSION` |
+| yes | anything else | – | `FLAG_FOR_REVIEW` |
+| no | ≥ 0.85 | no, or score < 0.95 | `FLAG_FOR_REVIEW` |
+| no | < 0.85 or unavailable | – | `ALLOW` |
 
 Velocity alone never blocks a session, because VPNs and mobile carriers produce false location jumps.
+
+A single high score only flags. An earlier version blocked on one score ≥ 0.95, which blocked 7.5% of simulated humans at least once in 10 minutes. Each human event has only a ~0.3% chance of scoring that high, but a human sends dozens of events. Replaying a 10-minute simulated run offline against several rules gave:
+
+| Block rule | Humans blocked | Power users blocked | Stealth scrapers blocked (median time) | Scrapers blocked (median time) |
+| --- | --- | --- | --- | --- |
+| One score ≥ 0.95 | 7.3% | 2.8% | 100% (38 s) | 100% (4 s) |
+| 3 of last 5 | 2.6% | 0.0% | 100% (66 s) | 100% (8 s) |
+| **8 of last 10** (chosen) | **0.6%** | **0.0%** | **100% (107 s)** | **100% (13 s)** |
+
+The humans still blocked under the chosen rule browse many distinct profiles with fairly regular timing, so they look like stealth scrapers. Tightening the rule further mainly slows bot detection; reducing them further needs better features, not a stricter rule.
 
 ### 4.6 Analytics (Apache Pinot)
 

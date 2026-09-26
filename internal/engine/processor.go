@@ -37,6 +37,9 @@ type Processor struct {
 	AITimeout time.Duration
 	Workers   int
 	Now       func() time.Time
+	// History holds recent scores per user for the sustained-evidence block
+	// rule. Created on first use; the consumer gives each partition its own.
+	History *detect.ScoreHistory
 }
 
 type item struct {
@@ -160,12 +163,19 @@ func (p *Processor) Finish(ctx context.Context, prep *Prepared) ([]event.Alert, 
 		return nil, res
 	}
 	scores := p.score(ctx, prep.items, &res)
+	if p.History == nil {
+		p.History = detect.NewScoreHistory()
+	}
 
 	now := p.now()
 	var alerts []event.Alert
 	for _, it := range prep.items {
 		score, has := scores[it.ev.EventID]
-		action := detect.Decide(it.velocity, score, has)
+		sustained := false
+		if has && !it.redelivered {
+			sustained = p.History.Record(it.ev.ViewerUserID, it.ev.Timestamp, score)
+		}
+		action := detect.Decide(it.velocity, score, has, sustained)
 		res.Events++
 		res.Actions[string(action)]++
 		if it.velocity {

@@ -166,13 +166,23 @@ func history(user string, n int) []event.Telemetry {
 func TestAIScoresDriveDecision(t *testing.T) {
 	s := &fakeScorer{score: 0.97}
 	p := newProc(s)
-	alerts, res, _ := p.Process(context.Background(), inputs(history("u1", detect.MinFeatureLen+2)...))
-	// The first MinFeatureLen-1 events lack history and are not scored.
-	if want := 3; len(alerts) != want || res.AIScored != uint64(want) || s.calls != 1 {
+	// The first MinFeatureLen-1 events lack history and are not scored. Of the
+	// scored ones, the first SustainedOf-1 only flag; blocks need sustained
+	// high scores.
+	n := detect.MinFeatureLen - 1 + detect.SustainedOf + 2
+	alerts, res, _ := p.Process(context.Background(), inputs(history("u1", n)...))
+	scored := n - (detect.MinFeatureLen - 1)
+	if len(alerts) != scored || res.AIScored != uint64(scored) || s.calls != 1 {
 		t.Fatalf("alerts %d scored %d calls %d", len(alerts), res.AIScored, s.calls)
 	}
+	if got := res.Actions["FLAG_FOR_REVIEW"]; got != uint64(detect.SustainedOf-1) {
+		t.Fatalf("flags = %d, want %d", got, detect.SustainedOf-1)
+	}
+	if got := res.Actions["BLOCK_SESSION"]; got != 3 {
+		t.Fatalf("blocks = %d, want 3", got)
+	}
 	for _, a := range alerts {
-		if a.ActionTaken != event.ActionBlockSession || *a.AnomalyScore != 0.97 {
+		if *a.AnomalyScore != 0.97 {
 			t.Fatalf("alert: %+v", a)
 		}
 	}

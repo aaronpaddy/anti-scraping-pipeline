@@ -6,6 +6,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# On macOS, keep the machine awake for the whole run: an idle sleep freezes
+# Docker mid-test and wrecks the latency numbers.
+if [ -z "${LOADTEST_AWAKE:-}" ] && command -v caffeinate >/dev/null; then
+  export LOADTEST_AWAKE=1
+  exec caffeinate -i "$0" "$@"
+fi
+
 RATE=${RATE:-10000}
 DURATION=${DURATION:-10m}
 SEED=${SEED:-$(date +%s)} # fresh users each run, so no state carries over

@@ -9,6 +9,7 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
+	"anti-scraping-pipeline/internal/detect"
 	"anti-scraping-pipeline/internal/stats"
 	"anti-scraping-pipeline/internal/store"
 )
@@ -124,6 +125,7 @@ func (c *Consumer) assigned(_ context.Context, _ *kgo.Client, assigned map[strin
 			// by this worker until the partition is revoked.
 			proc := *c.proc
 			proc.Store = store.NewCached(c.proc.Store)
+			proc.History = detect.NewScoreHistory()
 			go c.runPartition(w, &proc)
 			c.log.Info("partition assigned", "topic", topic, "partition", p)
 		}

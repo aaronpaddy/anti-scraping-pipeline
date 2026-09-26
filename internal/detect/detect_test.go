@@ -146,24 +146,61 @@ func TestFeatures(t *testing.T) {
 
 func TestDecide(t *testing.T) {
 	tests := []struct {
-		velocity bool
-		score    float64
-		hasScore bool
-		want     event.Action
+		velocity, hasScore, sustained bool
+		score                         float64
+		want                          event.Action
 	}{
-		{false, 0.97, true, event.ActionBlockSession},
-		{true, 0.97, true, event.ActionBlockSession},
-		{true, 0.90, true, event.ActionBlockSession},
-		{true, 0.50, true, event.ActionFlagForReview},
-		{true, 0, false, event.ActionFlagForReview},
-		{false, 0.90, true, event.ActionFlagForReview},
-		{false, 0.85, true, event.ActionFlagForReview},
-		{false, 0.84, true, event.ActionAllow},
-		{false, 0, false, event.ActionAllow},
+		{false, true, true, 0.97, event.ActionBlockSession},
+		{false, true, false, 0.97, event.ActionFlagForReview}, // one high score only flags
+		{true, true, true, 0.90, event.ActionBlockSession},
+		{true, true, false, 0.90, event.ActionFlagForReview},
+		{true, true, true, 0.50, event.ActionFlagForReview},
+		{true, false, false, 0, event.ActionFlagForReview},
+		{false, true, true, 0.90, event.ActionFlagForReview},
+		{false, true, false, 0.85, event.ActionFlagForReview},
+		{false, true, true, 0.84, event.ActionAllow},
+		{false, false, false, 0, event.ActionAllow},
 	}
 	for _, tc := range tests {
-		if got := Decide(tc.velocity, tc.score, tc.hasScore); got != tc.want {
-			t.Errorf("Decide(%v, %v, %v) = %s, want %s", tc.velocity, tc.score, tc.hasScore, got, tc.want)
+		if got := Decide(tc.velocity, tc.score, tc.hasScore, tc.sustained); got != tc.want {
+			t.Errorf("Decide(velocity=%v, score=%v, has=%v, sustained=%v) = %s, want %s",
+				tc.velocity, tc.score, tc.hasScore, tc.sustained, got, tc.want)
 		}
+	}
+}
+
+func TestScoreHistorySustained(t *testing.T) {
+	h := NewScoreHistory()
+	for i := 0; i < SustainedOf-1; i++ {
+		if h.Record("u", int64(i), 0.99) {
+			t.Fatalf("sustained after only %d scores", i+1)
+		}
+	}
+	if !h.Record("u", 9, 0.99) {
+		t.Fatal("10 high scores should be sustained")
+	}
+	// Three low scores leave 7 of the last 10 high: not sustained.
+	h.Record("u", 10, 0.1)
+	h.Record("u", 11, 0.1)
+	if !h.Record("u", 12, 0.99) {
+		t.Fatal("8 of 10 high should still be sustained")
+	}
+	if h.Record("u", 13, 0.1) {
+		t.Fatal("7 of 10 high should not be sustained")
+	}
+	// Other users are independent.
+	if h.Record("other", 13, 0.99) {
+		t.Fatal("a new user's first score cannot be sustained")
+	}
+}
+
+func TestScoreHistoryEvictsIdle(t *testing.T) {
+	h := NewScoreHistory()
+	h.Record("idle", 0, 0.5)
+	for i := 1; i <= 100_000; i++ {
+		h.Record("active", historyIdleMs+int64(i), 0.5)
+	}
+	if h.Len() != 1 {
+		t.Fatalf("tracked users = %d, want 1", h.Len())
 	}
 }
