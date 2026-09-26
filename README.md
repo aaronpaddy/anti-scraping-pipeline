@@ -61,6 +61,7 @@ Every flag also reads an environment variable (used by Compose):
 | `AI_TIMEOUT` | 20ms | AI call budget; on timeout the batch uses rules only |
 | `AI_URL` | `http://localhost:8000` | Empty string runs rules only |
 | `WORKERS` | 4 | Goroutines per batch (users sharded by hash) |
+| `AI_WORKERS` | 4 | AI engine worker processes (Compose variable, passed to uvicorn as `WEB_CONCURRENCY`) |
 
 ## Results
 
@@ -77,7 +78,7 @@ Measured 2026-09-26 on a MacBook with an Apple M4 (4 performance + 6 efficiency 
 | Stage time per batch | Redis/rules 2.3 ms, AI 6.8 ms, publish 0.3 ms |
 | Redis size | ~200 MB, 100k keys, flat over the run |
 
-The misses come from short spikes in which every stage slows at once, which points to CPU contention in the shared VM rather than one service. With the generator inside the VM, whole-run p99 was 115–344 ms across runs. Moving it out helped, but Kafka, Redis, Qdrant, the AI workers and the engine still share the same cores, half of which are efficiency cores. Turning off Redis log rewrites made no difference. Meeting 50 ms likely needs the pipeline on dedicated hardware.
+The misses come from short spikes in which every stage slows at once, which points to CPU contention in the shared VM rather than one service. With the generator inside the VM, whole-run p99 was 115–344 ms across runs. Moving it out helped, but Kafka, Redis, Qdrant, the AI workers and the engine still share the same cores, half of which are efficiency cores. Turning off Redis log rewrites made no difference. Cutting the AI engine from 4 workers to 2 (`AI_WORKERS=2`) made things worse: p99 300 ms, with 9,533 batches falling back to rules. Meeting 50 ms likely needs the pipeline on dedicated hardware.
 
 Detection accuracy over 10 minutes, including the harder personas (see [`spec.md`](spec.md) §4.1). "Blocked" is the share of users blocked at least once. The two columns compare the old rule (block on one score ≥ 0.95) with the current one (block only when 8 of the user's last 10 scores are high; see §4.5):
 
