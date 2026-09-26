@@ -10,6 +10,12 @@ generator ─► Kafka ─► Go engine ─► Kafka (alerts) ─► Pinot
                  Redis ◄┘   └─► AI engine (FastAPI) ─► Qdrant
 ```
 
+## Dashboard
+
+`make monitoring` starts Prometheus, Grafana and a Kafka lag exporter; the dashboard opens at http://localhost:3000. The engine serves Prometheus metrics on `:9100/metrics`. The screenshot below was taken during `make failover`, about 80 seconds after one of three engines was killed. The dead engine's partition has no owner until its session times out; its lag spikes, then a survivor takes over (Partitions owned). The headline tiles show values at the moment of capture:
+
+![Grafana dashboard during a failover test](docs/dashboard.png)
+
 ## Requirements
 
 - Docker with Compose v2 (for the full pipeline)
@@ -25,6 +31,7 @@ make stats               # engine counters and latency
 make loadtest DURATION=10m   # sustained run, then latency + accuracy report
 make loadtest-local DURATION=10m  # same, with the generator outside Docker
 make failover DURATION=3m    # 3 engines; one is killed mid-stream
+make monitoring          # Grafana dashboard at http://localhost:3000 (Prometheus on :9090)
 make analytics           # Pinot at http://localhost:9000; queries in pinot/queries.sql
 make down                # stop; `make reset` also deletes volumes
 ```
@@ -43,7 +50,7 @@ The Go suite includes an end-to-end test of the consumer. It runs against an in-
 
 | Path | What |
 | --- | --- |
-| `cmd/engine` | Evaluation engine: Kafka consumer, `GET /stats`, `POST /stats/reset` |
+| `cmd/engine` | Evaluation engine: Kafka consumer, `GET /metrics` (Prometheus), `GET /stats`, `POST /stats/reset` |
 | `cmd/generator` | Seeded traffic generator; writes `data/truth.json` |
 | `cmd/seed-export` | Builds labeled feature vectors for Qdrant |
 | `cmd/eval` | Reads the alerts topic and reports accuracy per persona |
@@ -53,6 +60,8 @@ The Go suite includes an end-to-end test of the consumer. It runs against an in-
 | `internal/gen` | Traffic simulator (human, power user, scraper, stealth scraper, teleporter) |
 | `ai/` | FastAPI AI engine and Qdrant seeding script |
 | `pinot/` | Pinot schema, real-time table config, sample queries |
+| `monitoring/` | Prometheus scrape config, Grafana provisioning and dashboard |
+| `scripts/` | Load test and failover test |
 
 ## Engine settings
 
@@ -104,10 +113,12 @@ With the current rule, 93.4% of blocked users are bots, up from 56%. The cost is
 | Check | Result |
 | --- | --- |
 | Nothing lost | Every partition fully committed after the run (consumer group lag 0, 1.8M events) |
-| Failover time | 9.6 s from the kill until a survivor took the dead engine's partition; the other partitions didn't move (cooperative-sticky rebalancing) |
-| Redelivery | The survivor re-received 11,113 events the dead engine had processed but not committed, and recognized each one |
-| State applied twice | None: 0 velocity alerts for users who never move |
-| Duplicate alerts | 3,869, from batches published but not committed before the kill (at-least-once delivery) |
-| Latency | The unaffected engine stayed at p99 97 ms; the engine that took over peaked at 4 s while catching up |
+| Failover time | 9.6–12.3 s over four runs, from the kill until a survivor took the dead engine's partition; the other partitions didn't move (cooperative-sticky rebalancing) |
+| Redelivery | The survivor re-received 900 events the dead engine had processed but not committed, and recognized each one |
+| State applied twice | None in any run: 0 velocity alerts for users who never move |
+| Duplicate alerts | 3, from work published but not yet committed at the kill (at-least-once delivery) |
+| Latency | The engine that took over peaked at about 4 s while catching up, then returned to normal |
+
+The engine commits offsets every second. With the client's default of 5 seconds, the same test redelivered 11,113 events and repeated 3,869 alerts.
 
 Recent-score history (used by the block rule) is kept in memory per partition, so users on the moved partition start over. They are still flagged, but can take longer to block.

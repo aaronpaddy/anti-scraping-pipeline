@@ -3,7 +3,7 @@ DURATION ?= 1m
 SEED     ?= 42
 COMPOSE  := docker compose
 
-.PHONY: test test-go test-ai venv build up down reset logs gen eval stats loadtest loadtest-local failover analytics
+.PHONY: test test-go test-ai venv build up down reset logs gen eval stats loadtest loadtest-local failover monitoring analytics
 
 test: test-go test-ai
 
@@ -28,11 +28,11 @@ up:
 	$(COMPOSE) up -d --build
 
 down:
-	$(COMPOSE) --profile load --profile analytics down
+	$(COMPOSE) --profile load --profile analytics --profile failover --profile monitoring down
 
 # Also deletes Kafka, Redis, Qdrant and seed volumes.
 reset:
-	$(COMPOSE) --profile load --profile analytics down -v
+	$(COMPOSE) --profile load --profile analytics --profile failover --profile monitoring down -v
 
 logs:
 	$(COMPOSE) logs -f engine ai-engine
@@ -60,6 +60,10 @@ loadtest-local:
 # make failover DURATION=3m KILL_AFTER=60
 failover:
 	RATE=$(RATE) DURATION=$(DURATION) KILL_AFTER=$(or $(KILL_AFTER),60) scripts/failover-test.sh
+
+# Start Prometheus + Grafana; dashboard at http://localhost:3000
+monitoring:
+	$(COMPOSE) --profile monitoring up -d prometheus kafka-exporter grafana
 
 # Start Pinot and register the alerts table (UI at http://localhost:9000).
 analytics:

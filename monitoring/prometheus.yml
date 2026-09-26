@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  # engine-2 and engine-3 only exist during `make failover`; they show as down otherwise.
+  - job_name: engine
+    static_configs:
+      - targets: ["engine:9100", "engine-2:9100", "engine-3:9100"]
+  - job_name: kafka
+    static_configs:
+      - targets: ["kafka-exporter:9308"]

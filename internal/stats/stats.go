@@ -95,6 +95,7 @@ type BatchResult struct {
 }
 
 func (s *Stats) Record(r BatchResult) {
+	recordProm(r)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.snap.Batches++

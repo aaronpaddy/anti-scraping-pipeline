@@ -152,7 +152,7 @@ The Go engine sends one request per micro-batch, never one per event.
 *   **Partition key:** `viewer_user_id`, so all of a user's events land on one partition, in order.
 *   **Producer durability:** `acks=1` — faster, and acceptable here because a lost telemetry event is low-cost. (With one local broker, `acks=all` behaves the same.)
 *   **Failure detection:** The group's session timeout is 10s (`SESSION_TIMEOUT`; the client default is 45s). A crashed engine's partitions move to the survivors about 10s after it stops heartbeating. Cooperative-sticky rebalancing leaves the survivors' own partitions in place. A failover test is in `scripts/failover-test.sh`.
-*   **Delivery semantics:** at-least-once. The consumer commits offsets only after a batch's alerts are acknowledged. A redelivered event never changes state twice, but its alert can be published again (§4.3).
+*   **Delivery semantics:** at-least-once. The consumer marks offsets only after a batch's alerts are acknowledged, and commits marked offsets every second. A crash therefore replays at most about a second of work: in the failover test, 900 redelivered events and 3 repeated alerts, versus 11,113 and 3,869 with a 5-second interval. A redelivered event never changes state twice, but its alert can be published again (§4.3).
 
 ### 4.3 Go Evaluation Engine
 
@@ -262,3 +262,5 @@ The full stack is defined in `docker-compose.yml`. Credentials there are local-d
 | `engine` | project image (Go) | Evaluation engine; `GET /stats` on port 9100 |
 | `generator`, `eval` | project image (Go) | Profile `load`: traffic and accuracy report |
 | `pinot`, `pinot-init` | `apachepinot/pinot:1.5.1` | Profile `analytics`: real-time table over the alerts topic |
+| `prometheus`, `grafana`, `kafka-exporter` | `prom/prometheus:v3.15.0`, `grafana/grafana:13.2.2`, `danielqsj/kafka-exporter:v1.10.0` | Profile `monitoring`: engine metrics, consumer lag, and a provisioned dashboard |
+| `engine-2`, `engine-3` | project image (Go) | Profile `failover`: extra engines in the same consumer group |

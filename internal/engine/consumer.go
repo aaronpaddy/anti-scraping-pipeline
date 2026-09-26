@@ -59,6 +59,9 @@ func NewConsumer(ctx context.Context, cfg ConsumerConfig, proc *Processor, st *s
 		kgo.ConsumerGroup(cfg.Group),
 		kgo.ConsumeTopics(cfg.InTopic),
 		kgo.AutoCommitMarks(),
+		// Commit processed offsets every second (default 5s): keeps the lag
+		// metric honest and bounds how much work a crash replays.
+		kgo.AutoCommitInterval(time.Second),
 		kgo.BlockRebalanceOnPoll(),
 		kgo.OnPartitionsAssigned(c.assigned),
 		kgo.OnPartitionsRevoked(c.revoked),
@@ -134,6 +137,7 @@ func (c *Consumer) assigned(_ context.Context, _ *kgo.Client, assigned map[strin
 			proc.Store = store.NewCached(c.proc.Store)
 			proc.History = detect.NewScoreHistory()
 			go c.runPartition(w, &proc)
+			stats.PartitionsOwned.Inc()
 			c.log.Info("partition assigned", "topic", topic, "partition", p)
 		}
 	}
@@ -217,6 +221,7 @@ func (c *Consumer) stop(parts map[string][]int32) {
 			k := tp{topic, p}
 			if w, ok := c.parts[k]; ok {
 				delete(c.parts, k)
+				stats.PartitionsOwned.Dec()
 				close(w.in)
 				ws = append(ws, w)
 			}

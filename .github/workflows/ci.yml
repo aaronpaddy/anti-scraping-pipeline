@@ -41,4 +41,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - run: docker compose --profile load --profile analytics --profile failover config --quiet
+      - run: docker compose --profile load --profile analytics --profile failover --profile monitoring config --quiet

@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 
 	"anti-scraping-pipeline/internal/cli"
@@ -70,6 +71,7 @@ func main() {
 		st.Reset()
 		w.WriteHeader(http.StatusNoContent)
 	})
+	mux.Handle("GET /metrics", promhttp.Handler())
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	srv := &http.Server{Addr: *statsAddr, Handler: mux}
 	go func() {
