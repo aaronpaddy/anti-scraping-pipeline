@@ -1,5 +1,7 @@
 # Real-Time Telemetry & Anti-Scraping Pipeline
 
+[![CI](https://github.com/aaronpaddy/anti-scraping-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/aaronpaddy/anti-scraping-pipeline/actions/workflows/ci.yml)
+
 Streams simulated clickstream events through Kafka and flags scraping bots in real time. A Go engine runs a location-speed check against per-user state in Redis. A Python service scores behavior with a k-NN search in Qdrant. See [`spec.md`](spec.md) for the design.
 
 ```
