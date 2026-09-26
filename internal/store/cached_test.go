@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"telemetry-pipeline/internal/detect"
+	"anti-scraping-pipeline/internal/detect"
 )
 
 // countingStore wraps a Store and records which users were loaded from it.

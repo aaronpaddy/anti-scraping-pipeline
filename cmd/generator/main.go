@@ -16,9 +16,9 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
-	"telemetry-pipeline/internal/cli"
-	"telemetry-pipeline/internal/event"
-	"telemetry-pipeline/internal/gen"
+	"anti-scraping-pipeline/internal/cli"
+	"anti-scraping-pipeline/internal/event"
+	"anti-scraping-pipeline/internal/gen"
 )
 
 func main() {

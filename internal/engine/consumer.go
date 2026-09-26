@@ -9,8 +9,8 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
-	"telemetry-pipeline/internal/stats"
-	"telemetry-pipeline/internal/store"
+	"anti-scraping-pipeline/internal/stats"
+	"anti-scraping-pipeline/internal/store"
 )
 
 type ConsumerConfig struct {

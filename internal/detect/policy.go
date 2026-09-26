@@ -1,6 +1,6 @@
 package detect
 
-import "telemetry-pipeline/internal/event"
+import "anti-scraping-pipeline/internal/event"
 
 // Score thresholds (spec §4.5).
 const (

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"telemetry-pipeline/internal/event"
+	"anti-scraping-pipeline/internal/event"
 )
 
 const (

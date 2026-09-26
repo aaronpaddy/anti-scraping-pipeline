@@ -12,10 +12,10 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
-	"telemetry-pipeline/internal/cli"
-	"telemetry-pipeline/internal/event"
-	"telemetry-pipeline/internal/gen"
-	"telemetry-pipeline/internal/report"
+	"anti-scraping-pipeline/internal/cli"
+	"anti-scraping-pipeline/internal/event"
+	"anti-scraping-pipeline/internal/gen"
+	"anti-scraping-pipeline/internal/report"
 )
 
 func main() {

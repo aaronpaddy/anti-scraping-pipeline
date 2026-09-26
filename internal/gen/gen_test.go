@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"testing"
 
-	"telemetry-pipeline/internal/detect"
-	"telemetry-pipeline/internal/event"
+	"anti-scraping-pipeline/internal/detect"
+	"anti-scraping-pipeline/internal/event"
 )
 
 var cfg = Config{Seed: 7, Users: 3000, ScraperPct: 0.05, TeleporterPct: 0.05, StealthPct: 0.05, PowerUserPct: 0.05, StartMs: 1_790_000_000_000}

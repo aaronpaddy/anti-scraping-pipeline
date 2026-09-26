@@ -9,7 +9,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"telemetry-pipeline/internal/detect"
+	"anti-scraping-pipeline/internal/detect"
 )
 
 const stateTTL = 30 * time.Minute

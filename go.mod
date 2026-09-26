@@ -1,4 +1,4 @@
-module telemetry-pipeline
+module anti-scraping-pipeline
 
 go 1.27.1
 

@@ -4,7 +4,7 @@ package store
 import (
 	"context"
 
-	"telemetry-pipeline/internal/detect"
+	"anti-scraping-pipeline/internal/detect"
 )
 
 // Update is the state to persist for one user after a batch.

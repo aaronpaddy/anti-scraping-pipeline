@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"telemetry-pipeline/internal/detect"
+	"anti-scraping-pipeline/internal/detect"
 )
 
 // Cached keeps user state in memory in front of a durable Store. It is only

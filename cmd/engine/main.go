@@ -14,11 +14,11 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"telemetry-pipeline/internal/cli"
-	"telemetry-pipeline/internal/engine"
-	"telemetry-pipeline/internal/event"
-	"telemetry-pipeline/internal/stats"
-	"telemetry-pipeline/internal/store"
+	"anti-scraping-pipeline/internal/cli"
+	"anti-scraping-pipeline/internal/engine"
+	"anti-scraping-pipeline/internal/event"
+	"anti-scraping-pipeline/internal/stats"
+	"anti-scraping-pipeline/internal/store"
 )
 
 func main() {

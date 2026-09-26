@@ -20,9 +20,9 @@ import (
 	"math/rand/v2"
 	"os"
 
-	"telemetry-pipeline/internal/cli"
-	"telemetry-pipeline/internal/detect"
-	"telemetry-pipeline/internal/gen"
+	"anti-scraping-pipeline/internal/cli"
+	"anti-scraping-pipeline/internal/detect"
+	"anti-scraping-pipeline/internal/gen"
 )
 
 func main() {

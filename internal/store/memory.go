@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"telemetry-pipeline/internal/detect"
+	"anti-scraping-pipeline/internal/detect"
 )
 
 // Memory is an in-process Store for tests and offline runs.

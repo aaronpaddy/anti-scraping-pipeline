@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"telemetry-pipeline/internal/event"
+	"anti-scraping-pipeline/internal/event"
 )
 
 // Scorer returns an anomaly score per event id.

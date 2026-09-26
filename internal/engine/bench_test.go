@@ -9,8 +9,8 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 
-	"telemetry-pipeline/internal/gen"
-	"telemetry-pipeline/internal/store"
+	"anti-scraping-pipeline/internal/gen"
+	"anti-scraping-pipeline/internal/store"
 )
 
 func benchBatches(n int) [][]Input {

@@ -2,13 +2,17 @@
 # Profile "load": generator and eval (run with `docker compose run`).
 # Profile "analytics": Apache Pinot (needs several GB of RAM).
 
+# Fixed project name, so container, volume and network names don't depend on
+# the folder this checkout lives in.
+name: anti-scraping-pipeline
+
 networks:
   telemetry-pipeline-mesh:
     driver: bridge
 
 x-go-image: &go-image
   build: .
-  image: telemetry-pipeline-go
+  image: anti-scraping-pipeline-go
   networks:
     - telemetry-pipeline-mesh
 
@@ -96,7 +100,7 @@ services:
   # One-off job: loads the vectors into Qdrant
   qdrant-seed:
     build: ./ai
-    image: telemetry-pipeline-ai
+    image: anti-scraping-pipeline-ai
     container_name: qdrant-seed
     networks:
       - telemetry-pipeline-mesh
@@ -113,7 +117,7 @@ services:
 
   # Python AI risk engine
   ai-engine:
-    image: telemetry-pipeline-ai
+    image: anti-scraping-pipeline-ai
     container_name: ai-engine
     networks:
       - telemetry-pipeline-mesh

@@ -8,7 +8,7 @@ import (
 	"math"
 	"math/rand/v2"
 
-	"telemetry-pipeline/internal/event"
+	"anti-scraping-pipeline/internal/event"
 )
 
 // Persona is a simulated user type.

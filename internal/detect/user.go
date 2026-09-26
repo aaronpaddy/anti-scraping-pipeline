@@ -1,6 +1,6 @@
 package detect
 
-import "telemetry-pipeline/internal/event"
+import "anti-scraping-pipeline/internal/event"
 
 // UserState is everything the engine keeps per viewer.
 type UserState struct {

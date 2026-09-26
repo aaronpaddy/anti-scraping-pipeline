@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"telemetry-pipeline/internal/event"
-	"telemetry-pipeline/internal/gen"
+	"anti-scraping-pipeline/internal/event"
+	"anti-scraping-pipeline/internal/gen"
 )
 
 func TestBuild(t *testing.T) {

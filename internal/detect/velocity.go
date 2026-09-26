@@ -3,7 +3,7 @@
 // features, and the decision policy.
 package detect
 
-import "telemetry-pipeline/internal/geo"
+import "anti-scraping-pipeline/internal/geo"
 
 // Velocity thresholds (spec §4.3).
 const (

@@ -8,7 +8,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"telemetry-pipeline/internal/store"
+	"anti-scraping-pipeline/internal/store"
 )
 
 // BenchmarkPrepareRedis runs stage 1 against a real Redis:

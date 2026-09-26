@@ -6,8 +6,8 @@ import (
 	"io"
 	"sort"
 
-	"telemetry-pipeline/internal/event"
-	"telemetry-pipeline/internal/gen"
+	"anti-scraping-pipeline/internal/event"
+	"anti-scraping-pipeline/internal/gen"
 )
 
 type PersonaStats struct {
