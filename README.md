@@ -12,9 +12,21 @@ generator ─► Kafka ─► Go engine ─► Kafka (alerts) ─► Pinot
 
 ## Dashboard
 
-`make monitoring` starts Prometheus, Grafana and a Kafka lag exporter; the dashboard opens at http://localhost:3000. The engine serves Prometheus metrics on `:9100/metrics`. The screenshot below was taken during `make failover`, about 80 seconds after one of three engines was killed. The dead engine's partition has no owner until its session times out; its lag spikes, then a survivor takes over (Partitions owned). The headline tiles show values at the moment of capture:
+`make monitoring` starts Prometheus, Grafana and a Kafka lag exporter; the dashboard opens at http://localhost:3000. The engine serves Prometheus metrics on `:9100/metrics`. The top tiles show the value at the end of the time range; p99 covers the last minute.
 
-![Grafana dashboard during a failover test](docs/dashboard.png)
+**Steady load:** one engine at 10,000 events/s for 3 minutes (`make loadtest-local`). Throughput is flat, all three partitions are owned, and lag stays at about one second of events between commits. p99 sits around 50–80 ms, with one spike at 16:08 that the last-minute p99 tile still includes.
+
+![Grafana dashboard during a steady 10k events/s load test](docs/dashboard-load.png)
+
+**Failover:** three engines; `engine-2` is hard-killed at 15:32:47 (`make failover`). Its partition has no owner for about 12 s, so that partition's lag spikes. Then `engine-3` takes it over (Partitions owned), and total throughput returns to 10,000 events/s.
+
+![Grafana dashboard during a failover test](docs/dashboard-failover.png)
+
+## Analytics
+
+`make analytics` starts Apache Pinot, which ingests the alerts topic in real time. The query console is at http://localhost:9000, and sample queries are in `pinot/queries.sql`. Below: every alert from the day's test runs, grouped by decision and by which signal fired, over 6.4 million rows:
+
+![Pinot query console grouping alerts by decision](docs/pinot-query.png)
 
 ## Requirements
 

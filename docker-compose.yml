@@ -226,13 +226,17 @@ services:
         until curl -sf http://pinot:9000/health >/dev/null; do sleep 3; done
         curl -sf -X POST -H 'Content-Type: application/json' -d @/pinot/schema.json 'http://pinot:9000/schemas?override=true'
         echo
-        if curl -sf http://pinot:9000/tables/telemetry_anomaly_alerts >/dev/null 2>&1 \
-            && curl -s http://pinot:9000/tables/telemetry_anomaly_alerts | grep -q REALTIME; then
-          echo "table already exists"
-        else
-          curl -sf -X POST -H 'Content-Type: application/json' -d @/pinot/table.json http://pinot:9000/tables
+        # The controller reports healthy before the server can host tables, so
+        # retry until the table exists.
+        for i in $$(seq 1 30); do
+          if curl -s http://pinot:9000/tables | grep -q telemetry_anomaly_alerts; then
+            echo "table ready"; exit 0
+          fi
+          curl -s -X POST -H 'Content-Type: application/json' -d @/pinot/table.json http://pinot:9000/tables
           echo
-        fi
+          sleep 5
+        done
+        echo "table was not created" >&2; exit 1
     volumes:
       - ./pinot:/pinot:ro
     depends_on:
