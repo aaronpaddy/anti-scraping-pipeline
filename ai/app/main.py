@@ -32,14 +32,17 @@ class ScoreResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    http = httpx.AsyncClient(
-        base_url=config.QDRANT_URL,
-        timeout=1.0,
-        limits=httpx.Limits(max_connections=32, max_keepalive_connections=32),
-    )
-    app.state.index = QdrantIndex(http, config.COLLECTION, config.KNN_K, config.HNSW_EF)
+    def new_client() -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            base_url=config.QDRANT_URL,
+            timeout=httpx.Timeout(1.0, pool=0.5),
+            limits=httpx.Limits(max_connections=32, max_keepalive_connections=32),
+        )
+
+    index = QdrantIndex(new_client(), config.COLLECTION, config.KNN_K, config.HNSW_EF, client_factory=new_client)
+    app.state.index = index
     yield
-    await http.aclose()
+    await index.http.aclose()
 
 
 app = FastAPI(title="AI Risk Engine", lifespan=lifespan)

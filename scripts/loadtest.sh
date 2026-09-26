@@ -3,6 +3,9 @@
 # the engine's throughput and latency and the detection accuracy.
 #
 #   RATE=10000 DURATION=10m scripts/loadtest.sh
+#
+# LOCAL_GEN=1 runs the generator natively instead of in Docker, so it does
+# not compete with the pipeline for the Docker VM's CPUs.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -23,7 +26,14 @@ curl -sf "$STATS" >/dev/null || { echo "engine not reachable at $STATS; run 'mak
 echo "== load test: $RATE events/s for $DURATION (seed $SEED)"
 curl -sf -X POST "$STATS/reset"
 start=$(date +%s)
-RATE=$RATE DURATION=$DURATION SEED=$SEED docker compose run --rm generator
+if [ -n "${LOCAL_GEN:-}" ]; then
+  echo "(generator running natively)"
+  mkdir -p bin data
+  go build -o bin/generator ./cmd/generator
+  bin/generator -brokers localhost:9092 -rate "$RATE" -duration "$DURATION" -seed "$SEED" -truth-out data/truth.json
+else
+  RATE=$RATE DURATION=$DURATION SEED=$SEED docker compose run --rm generator
+fi
 
 # Wait for the engine to drain what the generator sent.
 prev=-1

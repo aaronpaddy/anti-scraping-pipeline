@@ -64,21 +64,20 @@ Every flag also reads an environment variable (used by Compose):
 
 ## Results
 
-Measured 2026-09-26 on a laptop. Everything, including the load generator, ran in one Docker Desktop VM with 10 CPUs and 8 GB. Command: `make loadtest DURATION=10m` at 10,000 events/s.
+Measured 2026-09-26 on a MacBook with an Apple M4 (4 performance + 6 efficiency cores). Docker Desktop had all 10 cores and 8 GB. Command: `make loadtest-local DURATION=10m` at 10,000 events/s, with the generator running natively outside the Docker VM.
 
 | Metric | Result |
 | --- | --- |
-| Throughput | 6,000,007 events in 10 min; held 10k/s with no backlog |
+| Throughput | 5,999,994 events in 10 min; held 10k/s with no backlog |
 | Latency p50 | 16 ms |
-| Latency p99 (whole run) | 115 ms, **target of 50 ms not met** |
-| Latency p99 (typical 10 s window) | 25–50 ms |
-| AI calls falling back to rules | 3,764 of ~60,000 batches (6%) |
-| Stage time per batch | Redis/rules 2.1 ms, AI 6.9 ms, publish 0.3 ms |
-| Redis size | 192 MB, 100k keys, flat over the run |
+| Latency p99 (whole run) | 98 ms, **target of 50 ms not met** |
+| Latency max | 377 ms |
+| 10 s windows with p99 over 50 ms | 32 of 61 (8 over 100 ms) |
+| AI calls falling back to rules | 5,284 of ~60,000 batches (9%) |
+| Stage time per batch | Redis/rules 2.3 ms, AI 6.8 ms, publish 0.3 ms |
+| Redis size | ~200 MB, 100k keys, flat over the run |
 
-The misses come from spikes every minute or two, when one 10-second window's p99 reaches 100–430 ms. In those windows every stage slows at once, which points to CPU contention in the shared VM rather than one service. Turning off Redis log rewrites didn't help. The next thing to try is running the generator outside the VM, or on another machine.
-
-p99 varies between runs on the same machine: a later 10-minute run measured 344 ms, with 8,714 batches falling back to rules.
+The misses come from short spikes in which every stage slows at once, which points to CPU contention in the shared VM rather than one service. With the generator inside the VM, whole-run p99 was 115–344 ms across runs. Moving it out helped, but Kafka, Redis, Qdrant, the AI workers and the engine still share the same cores, half of which are efficiency cores. Turning off Redis log rewrites made no difference. Meeting 50 ms likely needs the pipeline on dedicated hardware.
 
 Detection accuracy over 10 minutes, including the harder personas (see [`spec.md`](spec.md) §4.1). "Blocked" is the share of users blocked at least once. The two columns compare the old rule (block on one score ≥ 0.95) with the current one (block only when 8 of the user's last 10 scores are high; see §4.5):
 

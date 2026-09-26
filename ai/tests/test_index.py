@@ -58,3 +58,34 @@ def test_ready():
         raise httpx.ConnectError("refused")
 
     assert not run(index_with(down).ready())
+
+
+def test_pool_exhaustion_replaces_client():
+    def exhausted(req):
+        raise httpx.PoolTimeout("pool exhausted")
+
+    def healthy(req):
+        return httpx.Response(200, json={"result": [{"points": [{"score": 0.9, "payload": {"label": "bot"}}]}]})
+
+    broken = httpx.AsyncClient(base_url="http://qdrant", transport=httpx.MockTransport(exhausted))
+    made = []
+
+    def factory():
+        c = httpx.AsyncClient(base_url="http://qdrant", transport=httpx.MockTransport(healthy))
+        made.append(c)
+        return c
+
+    idx = QdrantIndex(broken, "profiles", k=3, hnsw_ef=32, client_factory=factory)
+    assert run(idx.neighbors([[0.1] * 5])) == [[(0.9, "bot")]]
+    assert len(made) == 1 and idx.http is made[0] and broken.is_closed
+
+
+def test_pool_exhaustion_without_factory_raises():
+    def exhausted(req):
+        raise httpx.PoolTimeout("pool exhausted")
+
+    try:
+        run(index_with(exhausted).neighbors([[0.1] * 5]))
+    except httpx.PoolTimeout:
+        return
+    raise AssertionError("expected PoolTimeout")

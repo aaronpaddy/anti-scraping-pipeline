@@ -3,7 +3,7 @@ DURATION ?= 1m
 SEED     ?= 42
 COMPOSE  := docker compose
 
-.PHONY: test test-go test-ai venv build up down reset logs gen eval stats loadtest analytics
+.PHONY: test test-go test-ai venv build up down reset logs gen eval stats loadtest loadtest-local analytics
 
 test: test-go test-ai
 
@@ -51,6 +51,10 @@ stats:
 # Sustained load test: make loadtest RATE=10000 DURATION=10m
 loadtest:
 	RATE=$(RATE) DURATION=$(DURATION) scripts/loadtest.sh
+
+# Same, with the generator running natively outside the Docker VM.
+loadtest-local:
+	LOCAL_GEN=1 RATE=$(RATE) DURATION=$(DURATION) scripts/loadtest.sh
 
 # Start Pinot and register the alerts table (UI at http://localhost:9000).
 analytics:
