@@ -1,0 +1,18 @@
+{
+  "schemaName": "telemetry_anomaly_alerts",
+  "dimensionFieldSpecs": [
+    {"name": "event_id", "dataType": "STRING"},
+    {"name": "viewer_user_id", "dataType": "STRING"},
+    {"name": "action_taken", "dataType": "STRING"},
+    {"name": "geographic_velocity_triggered", "dataType": "BOOLEAN"},
+    {"name": "ai_score_available", "dataType": "BOOLEAN"}
+  ],
+  "metricFieldSpecs": [
+    {"name": "ai_scraping_anomaly_score", "dataType": "DOUBLE"},
+    {"name": "pipeline_processing_duration_ms", "dataType": "DOUBLE"}
+  ],
+  "dateTimeFieldSpecs": [
+    {"name": "evaluated_at", "dataType": "LONG", "format": "1:MILLISECONDS:EPOCH", "granularity": "1:MILLISECONDS"},
+    {"name": "event_timestamp", "dataType": "LONG", "format": "1:MILLISECONDS:EPOCH", "granularity": "1:MILLISECONDS"}
+  ]
+}

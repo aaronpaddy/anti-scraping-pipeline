@@ -1,0 +1,223 @@
+# Default services: Kafka, Redis, Qdrant, seeding jobs, AI engine, Go engine.
+# Profile "load": generator and eval (run with `docker compose run`).
+# Profile "analytics": Apache Pinot (needs several GB of RAM).
+
+networks:
+  telemetry-pipeline-mesh:
+    driver: bridge
+
+x-go-image: &go-image
+  build: .
+  image: telemetry-pipeline-go
+  networks:
+    - telemetry-pipeline-mesh
+
+services:
+  # Message broker (Apache Kafka in KRaft mode)
+  kafka-broker:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-broker
+    networks:
+      - telemetry-pipeline-mesh
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-broker:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka-broker:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+      # Local sandbox: a 10-minute load test writes about 1 GB, so keep 2 hours.
+      KAFKA_LOG_RETENTION_HOURS: 2
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    volumes:
+      - kafka_data_volume:/var/lib/kafka/data
+
+  # One-off job: waits for the broker, then creates both topics
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-init
+    networks:
+      - telemetry-pipeline-mesh
+    depends_on:
+      - kafka-broker
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        until kafka-topics --bootstrap-server kafka-broker:29092 --list >/dev/null 2>&1; do sleep 2; done
+        for t in platform-telemetry-clickstream telemetry-anomaly-alerts; do
+          kafka-topics --bootstrap-server kafka-broker:29092 --create --if-not-exists \
+            --topic "$$t" --partitions 3 --replication-factor 1
+        done
+
+  # Session state, activity windows, dedup keys
+  redis-cache:
+    image: redis:7.2-alpine
+    container_name: redis-cache
+    networks:
+      - telemetry-pipeline-mesh
+    ports:
+      - "6379:6379"
+    # AOF persists every write; RDB snapshots are off because forking the whole
+    # dataset every minute stalled writes under load.
+    command: redis-server --appendonly yes --save "" --requirepass "dev_pipeline_pass_99"
+    volumes:
+      - redis_data_volume:/data
+
+  # Vector database for behavior embeddings
+  qdrant:
+    image: qdrant/qdrant:v1.19.1
+    container_name: qdrant
+    networks:
+      - telemetry-pipeline-mesh
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data_volume:/qdrant/storage
+
+  # One-off job: builds labeled behavior vectors from simulated traffic
+  seed-export:
+    <<: *go-image
+    container_name: seed-export
+    command: ["seed-export", "-out", "/seed/seed.jsonl"]
+    volumes:
+      - seed_data_volume:/seed
+
+  # One-off job: loads the vectors into Qdrant
+  qdrant-seed:
+    build: ./ai
+    image: telemetry-pipeline-ai
+    container_name: qdrant-seed
+    networks:
+      - telemetry-pipeline-mesh
+    environment:
+      QDRANT_URL: http://qdrant:6333
+    command: ["python", "-m", "app.seed", "/seed/seed.jsonl"]
+    volumes:
+      - seed_data_volume:/seed
+    depends_on:
+      qdrant:
+        condition: service_started
+      seed-export:
+        condition: service_completed_successfully
+
+  # Python AI risk engine
+  ai-engine:
+    image: telemetry-pipeline-ai
+    container_name: ai-engine
+    networks:
+      - telemetry-pipeline-mesh
+    ports:
+      - "8000:8000"
+    environment:
+      QDRANT_URL: http://qdrant:6333
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      qdrant-seed:
+        condition: service_completed_successfully
+
+  # Go evaluation engine
+  engine:
+    <<: *go-image
+    container_name: engine
+    command: ["engine"]
+    ports:
+      - "9100:9100"
+    environment:
+      KAFKA_BROKERS: kafka-broker:29092
+      REDIS_ADDR: redis-cache:6379
+      REDIS_PASSWORD: dev_pipeline_pass_99
+      AI_URL: http://ai-engine:8000
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      redis-cache:
+        condition: service_started
+      ai-engine:
+        condition: service_healthy
+
+  # Traffic generator: docker compose run --rm -e RATE=10000 -e DURATION=1m generator
+  generator:
+    <<: *go-image
+    profiles: ["load"]
+    command: ["generator"]
+    environment:
+      KAFKA_BROKERS: kafka-broker:29092
+      TRUTH_OUT: /data/truth.json
+      RATE: ${RATE:-10000}
+      DURATION: ${DURATION:-1m}
+      SEED: ${SEED:-42}
+    volumes:
+      - ./data:/data
+
+  # Accuracy report for the last generator run
+  eval:
+    <<: *go-image
+    profiles: ["load"]
+    command: ["eval"]
+    environment:
+      KAFKA_BROKERS: kafka-broker:29092
+      TRUTH: /data/truth.json
+    volumes:
+      - ./data:/data
+
+  # Apache Pinot, single container (ZooKeeper, controller, broker, server)
+  pinot:
+    image: apachepinot/pinot:1.5.1
+    container_name: pinot
+    profiles: ["analytics"]
+    networks:
+      - telemetry-pipeline-mesh
+    # Controller UI, query console and REST API (POST /sql). The embedded
+    # broker listens on 8000 inside the container; queries go via the controller.
+    ports:
+      - "9000:9000"
+    command: ["QuickStart", "-type", "EMPTY"]
+    environment:
+      JAVA_OPTS: "-Xms1G -Xmx3G"
+
+  # One-off job: waits for Pinot, then registers the alerts schema and table
+  pinot-init:
+    image: apachepinot/pinot:1.5.1
+    container_name: pinot-init
+    profiles: ["analytics"]
+    networks:
+      - telemetry-pipeline-mesh
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        until curl -sf http://pinot:9000/health >/dev/null; do sleep 3; done
+        curl -sf -X POST -H 'Content-Type: application/json' -d @/pinot/schema.json 'http://pinot:9000/schemas?override=true'
+        echo
+        if curl -sf http://pinot:9000/tables/telemetry_anomaly_alerts >/dev/null 2>&1 \
+            && curl -s http://pinot:9000/tables/telemetry_anomaly_alerts | grep -q REALTIME; then
+          echo "table already exists"
+        else
+          curl -sf -X POST -H 'Content-Type: application/json' -d @/pinot/table.json http://pinot:9000/tables
+          echo
+        fi
+    volumes:
+      - ./pinot:/pinot:ro
+    depends_on:
+      - pinot
+
+volumes:
+  kafka_data_volume:
+  redis_data_volume:
+  qdrant_data_volume:
+  seed_data_volume:
