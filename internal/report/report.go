@@ -20,6 +20,13 @@ type PersonaStats struct {
 type Report struct {
 	Personas map[gen.Persona]*PersonaStats
 	Ignored  int // alerts for users not in the truth file or from before the run
+	// DuplicateAlerts counts alerts for an event already alerted on. Delivery
+	// is at-least-once, so a few are expected after a crash.
+	DuplicateAlerts int
+	// FalseVelocity counts velocity-triggered alerts for personas that never
+	// change location. Any here means state was applied out of order, e.g.
+	// by a botched handoff between engines.
+	FalseVelocity int
 }
 
 // Build aggregates alerts for users in the truth file, evaluated at or after
@@ -34,11 +41,20 @@ func Build(t gen.Truth, alerts []event.Alert) Report {
 	}
 	alerted := map[string]bool{}
 	blocked := map[string]bool{}
+	seenEvent := map[string]bool{}
 	for _, a := range alerts {
 		p, ok := t.Users[a.ViewerUserID]
 		if !ok || a.EvaluatedAt < t.StartedAt {
 			r.Ignored++
 			continue
+		}
+		if seenEvent[a.EventID] {
+			r.DuplicateAlerts++
+			continue
+		}
+		seenEvent[a.EventID] = true
+		if a.GeographicVelocityTriggered && p != gen.Teleporter {
+			r.FalseVelocity++
 		}
 		ps := r.Personas[p]
 		ps.Alerts[a.ActionTaken]++
@@ -89,6 +105,7 @@ func (r Report) Write(w io.Writer) {
 	}
 	fmt.Fprintf(w, "\nuser-level precision: alerted %.1f%%, blocked %.1f%%\n", 100*r.Precision(false), 100*r.Precision(true))
 	fmt.Fprintln(w, "(alerted/blocked for humans = false-positive rate; for bots = recall)")
+	fmt.Fprintf(w, "duplicate alerts: %d   velocity alerts for users who never move: %d\n", r.DuplicateAlerts, r.FalseVelocity)
 	if r.Ignored > 0 {
 		fmt.Fprintf(w, "ignored %d alerts from other runs\n", r.Ignored)
 	}

@@ -1,6 +1,7 @@
 # Default services: Kafka, Redis, Qdrant, seeding jobs, AI engine, Go engine.
 # Profile "load": generator and eval (run with `docker compose run`).
 # Profile "analytics": Apache Pinot (needs several GB of RAM).
+# Profile "failover": two extra engines (see scripts/failover-test.sh).
 
 # Fixed project name, so container, volume and network names don't depend on
 # the folder this checkout lives in.
@@ -136,7 +137,7 @@ services:
         condition: service_completed_successfully
 
   # Go evaluation engine
-  engine:
+  engine: &engine
     <<: *go-image
     container_name: engine
     command: ["engine"]
@@ -154,6 +155,21 @@ services:
         condition: service_started
       ai-engine:
         condition: service_healthy
+
+  # Extra engines in the same consumer group, for scripts/failover-test.sh
+  engine-2:
+    <<: *engine
+    container_name: engine-2
+    profiles: ["failover"]
+    ports:
+      - "9101:9100"
+
+  engine-3:
+    <<: *engine
+    container_name: engine-3
+    profiles: ["failover"]
+    ports:
+      - "9102:9100"
 
   # Traffic generator: docker compose run --rm -e RATE=10000 -e DURATION=1m generator
   generator:

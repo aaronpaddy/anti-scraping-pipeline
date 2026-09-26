@@ -3,7 +3,7 @@ DURATION ?= 1m
 SEED     ?= 42
 COMPOSE  := docker compose
 
-.PHONY: test test-go test-ai venv build up down reset logs gen eval stats loadtest loadtest-local analytics
+.PHONY: test test-go test-ai venv build up down reset logs gen eval stats loadtest loadtest-local failover analytics
 
 test: test-go test-ai
 
@@ -55,6 +55,11 @@ loadtest:
 # Same, with the generator running natively outside the Docker VM.
 loadtest-local:
 	LOCAL_GEN=1 RATE=$(RATE) DURATION=$(DURATION) scripts/loadtest.sh
+
+# Kill one of three engines mid-stream and check nothing is lost:
+# make failover DURATION=3m KILL_AFTER=60
+failover:
+	RATE=$(RATE) DURATION=$(DURATION) KILL_AFTER=$(or $(KILL_AFTER),60) scripts/failover-test.sh
 
 # Start Pinot and register the alerts table (UI at http://localhost:9000).
 analytics:

@@ -21,6 +21,8 @@ make gen                 # 10k events/s for 1 minute (RATE=, DURATION=, SEED=)
 make eval                # accuracy per persona for that run
 make stats               # engine counters and latency
 make loadtest DURATION=10m   # sustained run, then latency + accuracy report
+make loadtest-local DURATION=10m  # same, with the generator outside Docker
+make failover DURATION=3m    # 3 engines; one is killed mid-stream
 make analytics           # Pinot at http://localhost:9000; queries in pinot/queries.sql
 make down                # stop; `make reset` also deletes volumes
 ```
@@ -61,6 +63,7 @@ Every flag also reads an environment variable (used by Compose):
 | `AI_TIMEOUT` | 20ms | AI call budget; on timeout the batch uses rules only |
 | `AI_URL` | `http://localhost:8000` | Empty string runs rules only |
 | `WORKERS` | 4 | Goroutines per batch (users sharded by hash) |
+| `SESSION_TIMEOUT` | 10s | How long before a silent engine's partitions move to the others |
 | `AI_WORKERS` | 4 | AI engine worker processes (Compose variable, passed to uvicorn as `WEB_CONCURRENCY`) |
 
 ## Results
@@ -91,3 +94,18 @@ Detection accuracy over 10 minutes, including the harder personas (see [`spec.md
 | teleporter | ~1,050 | 8.9% | 0.8% (all flagged by the velocity check) |
 
 With the current rule, 93.4% of blocked users are bots, up from 56%. The cost is speed: offline replay puts the median time to block a stealth scraper at about 107 s, up from 38 s. The humans still blocked browse many distinct profiles with fairly regular timing, so they look like stealth scrapers; reducing them further needs better features.
+
+### Failover
+
+`make failover` runs three engines in one consumer group, streams 10,000 events/s for 3 minutes, and hard-kills one engine (`docker kill`, no graceful shutdown) after 60 seconds.
+
+| Check | Result |
+| --- | --- |
+| Nothing lost | Every partition fully committed after the run (consumer group lag 0, 1.8M events) |
+| Failover time | 9.6 s from the kill until a survivor took the dead engine's partition; the other partitions didn't move (cooperative-sticky rebalancing) |
+| Redelivery | The survivor re-received 11,113 events the dead engine had processed but not committed, and recognized each one |
+| State applied twice | None: 0 velocity alerts for users who never move |
+| Duplicate alerts | 3,869, from batches published but not committed before the kill (at-least-once delivery) |
+| Latency | The unaffected engine stayed at p99 97 ms; the engine that took over peaked at 4 s while catching up |
+
+Recent-score history (used by the block rule) is kept in memory per partition, so users on the moved partition start over. They are still flagged, but can take longer to block.

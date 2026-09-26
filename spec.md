@@ -151,6 +151,7 @@ The Go engine sends one request per micro-batch, never one per event.
 *   **Topics:** `platform-telemetry-clickstream` and `telemetry-anomaly-alerts`, 3 partitions each, created explicitly at startup (auto-create is disabled).
 *   **Partition key:** `viewer_user_id`, so all of a user's events land on one partition, in order.
 *   **Producer durability:** `acks=1` — faster, and acceptable here because a lost telemetry event is low-cost. (With one local broker, `acks=all` behaves the same.)
+*   **Failure detection:** The group's session timeout is 10s (`SESSION_TIMEOUT`; the client default is 45s). A crashed engine's partitions move to the survivors about 10s after it stops heartbeating. Cooperative-sticky rebalancing leaves the survivors' own partitions in place. A failover test is in `scripts/failover-test.sh`.
 *   **Delivery semantics:** at-least-once. The consumer commits offsets only after a batch's alerts are acknowledged. A redelivered event never changes state twice, but its alert can be published again (§4.3).
 
 ### 4.3 Go Evaluation Engine

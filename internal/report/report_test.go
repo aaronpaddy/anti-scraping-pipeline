@@ -13,16 +13,20 @@ func TestBuild(t *testing.T) {
 		"h1": gen.Human, "h2": gen.Human, "s1": gen.Scraper, "s2": gen.Scraper, "t1": gen.Teleporter,
 	}}
 	alerts := []event.Alert{
-		{ViewerUserID: "s1", EvaluatedAt: 200, ActionTaken: event.ActionBlockSession},
-		{ViewerUserID: "s1", EvaluatedAt: 201, ActionTaken: event.ActionBlockSession},
-		{ViewerUserID: "t1", EvaluatedAt: 200, ActionTaken: event.ActionFlagForReview},
-		{ViewerUserID: "h1", EvaluatedAt: 200, ActionTaken: event.ActionFlagForReview},
+		{EventID: "e1", ViewerUserID: "s1", EvaluatedAt: 200, ActionTaken: event.ActionBlockSession},
+		{EventID: "e2", ViewerUserID: "s1", EvaluatedAt: 201, ActionTaken: event.ActionBlockSession},
+		{EventID: "e2", ViewerUserID: "s1", EvaluatedAt: 202, ActionTaken: event.ActionBlockSession}, // redelivered
+		{EventID: "e3", ViewerUserID: "t1", EvaluatedAt: 200, ActionTaken: event.ActionFlagForReview, GeographicVelocityTriggered: true},
+		{EventID: "e4", ViewerUserID: "h1", EvaluatedAt: 200, ActionTaken: event.ActionFlagForReview, GeographicVelocityTriggered: true},
 		{ViewerUserID: "h2", EvaluatedAt: 50, ActionTaken: event.ActionBlockSession}, // before the run
 		{ViewerUserID: "other", EvaluatedAt: 200, ActionTaken: event.ActionBlockSession},
 	}
 	r := Build(truth, alerts)
 	if r.Ignored != 2 {
 		t.Fatalf("ignored = %d", r.Ignored)
+	}
+	if r.DuplicateAlerts != 1 || r.FalseVelocity != 1 {
+		t.Fatalf("duplicates = %d, false velocity = %d", r.DuplicateAlerts, r.FalseVelocity)
 	}
 	s := r.Personas[gen.Scraper]
 	if s.Users != 2 || s.UsersAlerted != 1 || s.UsersBlocked != 1 || s.Alerts[event.ActionBlockSession] != 2 {

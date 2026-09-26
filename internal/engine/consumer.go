@@ -21,6 +21,9 @@ type ConsumerConfig struct {
 	OutTopic    string
 	BatchSize   int
 	BatchWindow time.Duration
+	// SessionTimeout is how long the group waits for a silent member before
+	// moving its partitions to the others (franz-go's default is 45s).
+	SessionTimeout time.Duration
 }
 
 type tp struct {
@@ -51,7 +54,7 @@ type Consumer struct {
 
 func NewConsumer(ctx context.Context, cfg ConsumerConfig, proc *Processor, st *stats.Stats, log *slog.Logger) (*Consumer, error) {
 	c := &Consumer{cfg: cfg, proc: proc, stats: st, log: log, ctx: ctx, parts: map[tp]*partWorker{}}
-	cl, err := kgo.NewClient(
+	opts := []kgo.Opt{
 		kgo.SeedBrokers(cfg.Brokers...),
 		kgo.ConsumerGroup(cfg.Group),
 		kgo.ConsumeTopics(cfg.InTopic),
@@ -60,11 +63,15 @@ func NewConsumer(ctx context.Context, cfg ConsumerConfig, proc *Processor, st *s
 		kgo.OnPartitionsAssigned(c.assigned),
 		kgo.OnPartitionsRevoked(c.revoked),
 		kgo.OnPartitionsLost(c.lost),
-		kgo.FetchMaxWait(50*time.Millisecond),
+		kgo.FetchMaxWait(50 * time.Millisecond),
 		kgo.RequiredAcks(kgo.LeaderAck()),
 		kgo.DisableIdempotentWrite(),
 		kgo.ProducerLinger(0),
-	)
+	}
+	if cfg.SessionTimeout > 0 {
+		opts = append(opts, kgo.SessionTimeout(cfg.SessionTimeout))
+	}
+	cl, err := kgo.NewClient(opts...)
 	if err != nil {
 		return nil, err
 	}

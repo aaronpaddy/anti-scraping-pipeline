@@ -33,6 +33,7 @@ func main() {
 	workers := flag.Int("workers", cli.EnvInt("WORKERS", 4), "worker goroutines per batch")
 	statsAddr := flag.String("stats-addr", cli.Env("STATS_ADDR", ":9100"), "address for GET /stats")
 	statsEvery := flag.Duration("stats-interval", cli.EnvDuration("STATS_INTERVAL", 10*time.Second), "how often to log stats")
+	sessionTimeout := flag.Duration("session-timeout", cli.EnvDuration("SESSION_TIMEOUT", 10*time.Second), "how long before a silent engine's partitions move to others")
 	flag.Parse()
 
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -47,12 +48,13 @@ func main() {
 	st := stats.New()
 
 	c, err := engine.NewConsumer(ctx, engine.ConsumerConfig{
-		Brokers:     cli.Split(*brokers),
-		Group:       *group,
-		InTopic:     event.ClickstreamTopic,
-		OutTopic:    event.AlertsTopic,
-		BatchSize:   *batchSize,
-		BatchWindow: *batchWindow,
+		Brokers:        cli.Split(*brokers),
+		Group:          *group,
+		InTopic:        event.ClickstreamTopic,
+		OutTopic:       event.AlertsTopic,
+		BatchSize:      *batchSize,
+		BatchWindow:    *batchWindow,
+		SessionTimeout: *sessionTimeout,
 	}, proc, st, log)
 	if err != nil {
 		log.Error("kafka client", "err", err)
