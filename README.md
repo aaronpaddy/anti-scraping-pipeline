@@ -78,10 +78,16 @@ Measured 2026-09-26 on a laptop. Everything, including the load generator, ran i
 
 The misses come from spikes every minute or two, when one 10-second window's p99 reaches 100–430 ms. In those windows every stage slows at once, which points to CPU contention in the shared VM rather than one service. Turning off Redis log rewrites didn't help. The next thing to try is running the generator outside the VM, or on another machine.
 
+p99 varies between runs on the same machine: a later 10-minute run measured 344 ms, with 8,714 batches falling back to rules.
+
+Detection accuracy from that later run, which includes the harder personas (see [`spec.md`](spec.md) §4.1). "Alerted" and "Blocked" are the share of users with at least one such decision in 10 minutes:
+
 | Persona | Users | Alerted | Blocked |
 | --- | --- | --- | --- |
-| human | 46,469 | 0.0% (8 events) | 0.0% |
-| scraper | 2,540 | 100% | 100% |
-| teleporter | 991 | 100% | 0.1% |
+| human | 42,508 | 12.5% | 7.5% |
+| power user | 2,382 | 3.9% | 2.4% |
+| scraper | 2,543 | 100% | 100% |
+| stealth scraper | 1,478 | 100% | 100% |
+| teleporter | 1,089 | 100% | 8.9% |
 
-These accuracy numbers are too good to mean much: the simulated scrapers are trivially separable from humans. A harder scraper persona is needed before they say anything.
+Every bot type is caught, but user-level precision is only 56% for blocks: about 1 in 13 ordinary humans gets blocked at least once. Each human event has a small chance of scoring above the block threshold (about 0.3% offline), and a human sends dozens of events in 10 minutes. Blocking on a single event is too aggressive.
